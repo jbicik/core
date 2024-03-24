@@ -1,0 +1,15 @@
+{
+  "domain": "infigy",
+  "name": "infigy",
+  "codeowners": ["@jbicik"],
+  "config_flow": true,
+  "dependencies": [],
+  "documentation": "https://www.home-assistant.io/integrations/infigy",
+  "homekit": {},
+  "iot_class": "local_push",
+  "single_config_entry": true,
+  "requirements": ["python-socketio==5.11.1"],
+  "ssdp": [],
+  "zeroconf": [],
+  "integration_type": "device"
+}

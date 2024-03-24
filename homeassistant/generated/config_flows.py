@@ -241,6 +241,7 @@ FLOWS = {
         "ifttt",
         "imap",
         "improv_ble",
+        "infigy",
         "inkbird",
         "insteon",
         "intellifire",

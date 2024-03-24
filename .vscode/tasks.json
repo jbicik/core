@@ -139,7 +139,8 @@
       }
     },
     {
-      "label": "Run scaffold",
+      "label": "Run
+      d",
       "detail": "Add new functionality to a integration using a scaffold.",
       "type": "shell",
       "command": "python3 -m script.scaffold ${input:scaffoldName} --integration ${input:integrationName}",
