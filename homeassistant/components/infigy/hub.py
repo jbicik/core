@@ -7,7 +7,7 @@ from __future__ import annotations
 # for more information.
 # This dummy hub always returns 3 rollers.
 import logging
-
+import time
 import socketio
 
 from homeassistant.core import HomeAssistant
@@ -25,7 +25,7 @@ class Hub:
         self._host = host
 
         self._hass = hass
-        self.data = None
+        self.data = {}
         self.online = False
         self._name = host
         self._id = host.lower()
@@ -35,12 +35,19 @@ class Hub:
 
         self.sio = socketio.AsyncClient()
 
+        @self.sio.on("store:snapshot")
+        async def on_snapshot(data):
+            _LOGGER.info("Received initial snapshot")
+            _LOGGER.debug(data)
+            if data["store"] is not None:
+                self.data.update(data["store"])
+
         @self.sio.on("store:change")
-        async def on_message(data):
+        async def on_update(data):
             _LOGGER.debug(data)
 
             if data["payload"] is not None:
-                self.data = data["payload"]
+                self.data.update(data["payload"])
 
         @self.sio.event
         async def connect():
@@ -56,12 +63,19 @@ class Hub:
         async def disconnect():
             _LOGGER.warning("Infigy disconnected!")
             self.online = False
+            # await self.connect()
+
+    async def connect(self) -> bool:
+        """Async connection to the device."""
+        _LOGGER.info("Connecting to %s", self._host)
+        await self.sio.connect(
+            f"http://{self._host}", socketio_path="core/socket.io", retry=False
+        )
+        return self.sio.connected
 
     async def async_setup_entry(self) -> bool:
         """Async connection to the device."""
-        _LOGGER.info("Connecting to %s", self._host)
-        await self.sio.connect(f"http://{self._host}", socketio_path="core/socket.io")
-        return True
+        return await self.connect()
 
     @property
     def hub_id(self) -> str:
