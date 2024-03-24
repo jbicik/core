@@ -7,7 +7,6 @@ from __future__ import annotations
 # for more information.
 # This dummy hub always returns 3 rollers.
 import logging
-import random
 
 import socketio
 
@@ -26,14 +25,12 @@ class Hub:
         self._host = host
 
         self._hass = hass
-        self.sensors = None
+        self.data = None
         self.online = False
         self._name = host
         self._id = host.lower()
-        self.rollers = [
-            Roller(f"{self._id}_1", f"{self._name} 1", self),
-            #            Roller(f"{self._id}_2", f"{self._name} 2", self),
-            #            Roller(f"{self._id}_3", f"{self._name} 3", self),
+        self.sensors = [
+            Sensor(f"{self._id}_1", f"{self._name} 1", self),
         ]
 
         self.sio = socketio.AsyncClient()
@@ -43,27 +40,27 @@ class Hub:
             _LOGGER.debug(data)
 
             if data["payload"] is not None:
-                self.sensors = data["payload"]
-
-        # self.rollers[0].set_position(data["payload"]["HW_TEMP"])
+                self.data = data["payload"]
 
         @self.sio.event
         async def connect():
-            _LOGGER.debug("I'm connected!")
+            _LOGGER.info("Infigy connected!")
+            self.online = True
 
         @self.sio.event
         async def connect_error(data):
             _LOGGER.debug("The connection failed!")
+            self.online = False
 
         @self.sio.event
         async def disconnect():
-            _LOGGER.debug("I'm disconnected!")
+            _LOGGER.warning("Infigy disconnected!")
+            self.online = False
 
     async def async_setup_entry(self) -> bool:
         """Async connection to the device."""
         _LOGGER.info("Connecting to %s", self._host)
         await self.sio.connect(f"http://{self._host}", socketio_path="core/socket.io")
-        self.online = True
         return True
 
     @property
@@ -76,90 +73,11 @@ class Hub:
         return True
 
 
-class Roller:
-    """Dummy roller (device for HA) for Hello World example."""
+class Sensor:
+    """Dummy sensor."""
 
-    def __init__(self, rollerid: str, name: str, hub: Hub) -> None:
+    def __init__(self, sensorid: str, name: str, hub: Hub) -> None:
         """Init dummy roller."""
-        self._id = rollerid
+        self._id = sensorid
         self.hub = hub
         self.name = name
-        self._callbacks = set()
-        #        self._loop = asyncio.get_event_loop()
-        self._target_position = 100
-        self._current_position = 100
-        self._value = 0
-        # Reports if the roller is moving up or down.
-        # >0 is up, <0 is down. This very much just for demonstration.
-        self.moving = 0
-
-        # Some static information about this device
-        self.firmware_version = f"0.0.{random.randint(1, 9)}"
-        self.model = "Test Device"
-
-    @property
-    def roller_id(self) -> str:
-        """Return ID for roller."""
-        return self._id
-
-    @property
-    def position(self):
-        """Return position for roller."""
-        return self._current_position
-
-    async def set_position(self, position: int) -> None:
-        """Set dummy cover to the given position.
-
-        State is announced a random number of seconds later.
-        """
-        self._target_position = position
-
-        # Update the moving status, and broadcast the update
-        self.moving = position
-        await self.publish_updates()
-
-        # self._loop.create_task(self.delayed_update())
-
-    async def delayed_update(self) -> None:
-        """Publish updates, with a random delay to emulate interaction with device."""
-        #        await asyncio.sleep(random.randint(1, 10))
-        self.moving = 0
-        await self.publish_updates()
-
-    def register_callback(self, callback: Callable[[], None]) -> None:
-        """Register callback, called when Roller changes state."""
-        self._callbacks.add(callback)
-
-    def remove_callback(self, callback: Callable[[], None]) -> None:
-        """Remove previously registered callback."""
-        self._callbacks.discard(callback)
-
-    # In a real implementation, this library would call it's call backs when it was
-    # notified of any state changeds for the relevant device.
-    async def publish_updates(self) -> None:
-        """Schedule call all registered callbacks."""
-        self._current_position = self._target_position
-        for callback in self._callbacks:
-            callback()
-
-    @property
-    def online(self) -> float:
-        """Roller is online."""
-        # The dummy roller is offline about 10% of the time. Returns True if online,
-        # False if offline.
-        return random.random() > 0.1
-
-    @property
-    def battery_level(self) -> int:
-        """Battery level as a percentage."""
-        return random.randint(0, 100)
-
-    @property
-    def battery_voltage(self) -> float:
-        """Return a random voltage roughly that of a 12v battery."""
-        return self._value
-
-    @property
-    def illuminance(self) -> int:
-        """Return a sample illuminance in lux."""
-        return random.randint(0, 500)

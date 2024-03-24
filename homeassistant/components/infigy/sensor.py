@@ -5,14 +5,16 @@
 # to display it in the UI (for know types). The unit_of_measurement property tells HA
 # what the unit is, so it can display the correct range. For predefined types (such as
 # battery), the unit_of_measurement should match what's expected.
-import random
-
-from homeassistant.const import (
-    DEVICE_CLASS_BATTERY,
-    DEVICE_CLASS_ILLUMINANCE,
-    PERCENTAGE,
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorStateClass,
 )
-from homeassistant.helpers.entity import Entity
+from homeassistant.const import UnitOfTemperature
+from homeassistant.const import UnitOfPower
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.typing import ConfigType, DiscoveryInfoType
 
 from .const import DOMAIN
 
@@ -24,174 +26,49 @@ from .const import DOMAIN
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Add sensors for passed config_entry in HA."""
     hub = hass.data[DOMAIN][config_entry.entry_id]
-
-    new_devices = []
-    #    for sensor in hub.sensors:
-    new_devices.append(InfigySensor(hub, "sensor"))
-
-    #        new_devices.append(IlluminanceSensor(roller))
-    if new_devices:
-        async_add_entities(new_devices)
+    async_add_entities(InfigySensor(sensor) for sensor in hub.sensors)
+    async_add_entities(InfigySensorBoiler(sensor) for sensor in hub.sensors)
 
 
-# This base class shows the common properties and methods for a sensor as used in this
-# example. See each sensor for further details about properties and methods that
-# have been overridden.
-class SensorBase(Entity):
-    """Base representation of a Hello World Sensor."""
-
-    should_poll = False
-
-    def __init__(self, roller) -> None:
-        """Initialize the sensor."""
-        self._roller = roller
-
-    # To link this entity to the cover device, this property must return an
-    # identifiers value matching that used in the cover, but no other information such
-    # as name. If name is returned, this entity will then also become a device in the
-    # HA UI.
-    @property
-    def device_info(self):
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, self._roller.roller_id)}}
-
-    # This property is important to let HA know if this entity is online or not.
-    # If an entity is offline (return False), the UI will refelect this.
-    @property
-    def available(self) -> bool:
-        """Return True if roller and hub is available."""
-        return self._roller.online and self._roller.hub.online
-
-    async def async_added_to_hass(self):
-        """Run when this Entity has been added to HA."""
-        # Sensors should also register callbacks to HA when their state changes
-        self._roller.register_callback(self.async_write_ha_state)
-
-    async def async_will_remove_from_hass(self):
-        """Entity being removed from hass."""
-        # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self._roller.remove_callback(self.async_write_ha_state)
-
-
-class BatterySensor(SensorBase):
+class InfigySensor(SensorEntity):
     """Representation of a Sensor."""
 
-    # The class of this device. Note the value should come from the homeassistant.const
-    # module. More information on the available devices classes can be seen here:
-    # https://developers.home-assistant.io/docs/core/entity/sensor
-    device_class = DEVICE_CLASS_BATTERY
+    _attr_name = "Boiler Temperature"
+    _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
+    _attr_device_class = SensorDeviceClass.TEMPERATURE
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
-    # The unit of measurement for this entity. As it's a DEVICE_CLASS_BATTERY, this
-    # should be PERCENTAGE. A number of units are supported by HA, for some
-    # examples, see:
-    # https://developers.home-assistant.io/docs/core/entity/sensor#available-device-classes
-    _attr_unit_of_measurement = PERCENTAGE
-
-    def __init__(self, roller):
+    def __init__(self, sensor) -> None:
         """Initialize the sensor."""
-        super().__init__(roller)
+        # Usual setup is done here. Callbacks are added in async_added_to_hass.
+        self._hub = sensor.hub
+        self._name = sensor.name
 
-        # As per the sensor, this must be a unique value within this domain. This is done
-        # by using the device ID, and appending "_battery"
-        self._attr_unique_id = f"{self._roller.roller_id}_battery"
+    def update(self) -> None:
+        """Fetch new state data for the sensor.
 
-        # The name of the entity
-        self._attr_name = f"{self._roller.name} Battery"
-
-        self._state = random.randint(0, 100)
-
-    # The value of this sensor. As this is a DEVICE_CLASS_BATTERY, this value must be
-    # the battery level as a percentage (between 0 and 100)
-    @property
-    def state(self):
-        """Return the state of the sensor."""
-        return self._roller.battery_level
+        This is the only method that should fetch new data for Home Assistant.
+        """
+        self._attr_native_value = self._hub.data["HW_TEMP"]
 
 
-# This is another sensor, but more simple compared to the battery above. See the
-# comments above for how each field works.
-class IlluminanceSensor(SensorBase):
+class InfigySensorBoiler(SensorEntity):
     """Representation of a Sensor."""
 
-    device_class = DEVICE_CLASS_ILLUMINANCE
-    _attr_unit_of_measurement = "lx"
+    _attr_name = "Boiler Power"
+    _attr_native_unit_of_measurement = UnitOfPower.KILO_WATT
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
-    def __init__(self, roller):
+    def __init__(self, sensor) -> None:
         """Initialize the sensor."""
-        super().__init__(roller)
-        # As per the sensor, this must be a unique value within this domain. This is done
-        # by using the device ID, and appending "_battery"
-        self._attr_unique_id = f"{self._roller.roller_id}_illuminance"
+        # Usual setup is done here. Callbacks are added in async_added_to_hass.
+        self._hub = sensor.hub
+        self._name = sensor.name
 
-        # The name of the entity
-        self._attr_name = f"{self._roller.name} Illuminance"
+    def update(self) -> None:
+        """Fetch new state data for the sensor.
 
-    @property
-    def state(self):
-        """Return the state of the sensor."""
-        return self._roller.illuminance
-
-
-class InfigySensor(Entity):
-    """Base representation of a Hello World Sensor."""
-
-    should_poll = False
-    device_class = DEVICE_CLASS_ILLUMINANCE
-    _attr_unit_of_measurement = "lx"
-
-    def __init__(self, hub, name) -> None:
-        """Initialize the sensor."""
-        self._hub = hub
-        self._callbacks = set()
-        self._name = name
-        self._attr_unique_id = "100_100_1_2_1_temp"
-
-        # The name of the entity
-        self._attr_name = f"{self._name} Temperature"
-
-    # To link this entity to the cover device, this property must return an
-    # identifiers value matching that used in the cover, but no other information such
-    # as name. If name is returned, this entity will then also become a device in the
-    # HA UI.
-    @property
-    def device_info(self):
-        """Return information to link this entity with the correct device."""
-        return {"identifiers": {(DOMAIN, "100_100_1_2_1_temp")}}
-
-    # This property is important to let HA know if this entity is online or not.
-    # If an entity is offline (return False), the UI will refelect this.
-    @property
-    def available(self) -> bool:
-        """Return True if roller and hub is available."""
-        return self._hub.online
-
-    async def async_added_to_hass(self):
-        """Run when this Entity has been added to HA."""
-        # Sensors should also register callbacks to HA when their state changes
-        self.register_callback(self.async_write_ha_state)
-
-    async def async_will_remove_from_hass(self):
-        """Entity being removed from hass."""
-        # The opposite of async_added_to_hass. Remove any registered call backs here.
-        self.remove_callback(self.async_write_ha_state)
-
-    @property
-    def state(self):
-        """Return the state of the sensor."""
-        return self._hub.sensors["HW_TEMP"]
-
-    def register_callback(self, callback: Callable[[], None]) -> None:
-        """Register callback, called when Roller changes state."""
-        self._callbacks.add(callback)
-
-    def remove_callback(self, callback: Callable[[], None]) -> None:
-        """Remove previously registered callback."""
-        self._callbacks.discard(callback)
-
-    # In a real implementation, this library would call it's call backs when it was
-    # notified of any state changeds for the relevant device.
-    async def publish_updates(self) -> None:
-        """Schedule call all registered callbacks."""
-        self.state = _hub.sensors["HW_TEMP"]
-        for callback in self._callbacks:
-            callback()
+        This is the only method that should fetch new data for Home Assistant.
+        """
+        self._attr_native_value = self._hub.data["HW_INFO"]["Consumption"][0]
